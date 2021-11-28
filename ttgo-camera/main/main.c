@@ -330,16 +330,15 @@ static camera_config_t camera_config = {
     .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
 };
 
-static esp_err_t init_camera()
-{
+static esp_err_t init_camera(void) {
     //initialize the camera
     esp_err_t err = esp_camera_init(&camera_config);
-    if (err != ESP_OK)
-    {
+    if (err != ESP_OK) {
         ESP_LOGE(TAG, "Camera Init Failed");
         return err;
     }
 
+    // all good
     return ESP_OK;
 }
 
@@ -348,7 +347,7 @@ static const char* _STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" 
 static const char* _STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
 static const char* _STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
 
-esp_err_t jpg_stream_httpd_handler(httpd_req_t *req){
+esp_err_t stream_httpd_handler(httpd_req_t *req) {
     camera_fb_t * fb = NULL;
     esp_err_t res = ESP_OK;
     size_t _jpg_buf_len;
@@ -414,6 +413,14 @@ esp_err_t jpg_stream_httpd_handler(httpd_req_t *req){
     return res;
 }
 
+esp_err_t root_httpd_handler(httpd_req_t *req) {
+    static const char page[] = "<!DOCTYPE html><body><form action=\"/stream\"><input type=\"submit\" value=\"Watch Stream\" /></form></body></html>";
+
+    httpd_resp_send(req, page, strlen(page));
+    
+    return ESP_OK;
+}
+
 void app_main()
 {
     // initialize flash
@@ -436,16 +443,25 @@ void app_main()
     config.server_port = 80;
 
     httpd_handle_t stream_httpd = NULL;
-    httpd_uri_t index_uri = {
+
+    httpd_uri_t root_uri = {
         .uri       = "/",
         .method    = HTTP_GET,
-        .handler   = jpg_stream_httpd_handler,
+        .handler   = root_httpd_handler,
+        .user_ctx  = NULL
+    };
+
+    httpd_uri_t stream_uri = {
+        .uri       = "/stream",
+        .method    = HTTP_GET,
+        .handler   = stream_httpd_handler,
         .user_ctx  = NULL
     };
     
     //Serial.printf("Starting web server on port: '%d'\n", config.server_port);
     if (httpd_start(&stream_httpd, &config) == ESP_OK) {
-        httpd_register_uri_handler(stream_httpd, &index_uri);
+        httpd_register_uri_handler(stream_httpd, &root_uri);
+        httpd_register_uri_handler(stream_httpd, &stream_uri);
     }
 }
 #endif
